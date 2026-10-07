@@ -101,6 +101,16 @@ class TestSignature:
         assert resp.status_code == 401
         assert status_of(client, payment_id) == "pending"
 
+    def test_non_ascii_signature_is_401_not_500(self, client, payment_id):
+        body = json.dumps({"payment_id": payment_id, "status": "succeeded"}).encode()
+        headers = {"Content-Type": "application/json", "X-Signature": "é".encode()}
+        resp = client.post("/webhooks/bank", content=body, headers=headers)
+        assert resp.status_code == 401
+
+    def test_signature_checked_before_body(self, client):
+        resp = self.post_signed(client, {"payment_id": "oops"}, "deadbeef")
+        assert resp.status_code == 401
+
     def test_signature_from_other_body(self, client, payment_id):
         # подпись от одного тела не подходит к другому
         signed = sign(

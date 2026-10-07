@@ -23,7 +23,10 @@ async def verify_signature(
     if secret is None:
         return
     body = await request.body()
-    if x_signature is None or not hmac.compare_digest(sign(body, secret), x_signature):
+    # Сравниваем байты: compare_digest на строках с не-ASCII символами падает с TypeError
+    if x_signature is None or not hmac.compare_digest(
+        sign(body, secret).encode(), x_signature.encode()
+    ):
         raise HTTPException(status_code=401, detail="Invalid signature")
 
 
