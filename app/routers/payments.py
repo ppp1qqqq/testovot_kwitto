@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from fastapi.exceptions import RequestValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -50,7 +50,8 @@ def list_payments(
 ) -> list[Payment]:
     query = select(Payment).order_by(Payment.id)
     if email is not None:
-        query = query.where(Payment.email == email)
+        # EmailStr приводит к нижнему регистру только домен, поэтому сравниваем без учёта регистра
+        query = query.where(func.lower(Payment.email) == email.strip().lower())
     if status_ is not None:
         query = query.where(Payment.status == status_)
     return list(session.scalars(query.limit(limit).offset(offset)))

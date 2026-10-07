@@ -28,6 +28,9 @@ class PaymentCreate(BaseModel):
         if value is None:
             return None
         code = normalize_promo_code(value)
+        if not code:
+            # формы часто присылают пустую строку вместо null
+            return None
         if code not in PROMO_CODES:
             raise ValueError("unknown promo code")
         return code
