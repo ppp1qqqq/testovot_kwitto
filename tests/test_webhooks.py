@@ -1,7 +1,11 @@
 import json
 
 import pytest
+from sqlalchemy import update
 
+from app import services
+from app.enums import PaymentStatus
+from app.models import Payment
 from app.routers.webhooks import sign
 
 
@@ -60,9 +64,37 @@ def test_forbidden_transition(client, payment_id, path, forbidden):
     assert status_of(client, payment_id) == before
 
 
+def test_concurrent_webhook_is_not_overwritten(client, payment_id, monkeypatch):
+    # Пока обрабатываем "failed", другой вебхук успевает перевести платёж в succeeded.
+    # Наш UPDATE ... WHERE status = 'pending' не должен затереть его результат.
+    real_check = services.can_transition
+
+    def check_while_other_webhook_wins(current, new):
+        with client.app.state.session_factory() as other:
+            other.execute(
+                update(Payment)
+                .where(Payment.id == payment_id)
+                .values(status=PaymentStatus.SUCCEEDED)
+            )
+            other.commit()
+        return real_check(current, new)
+
+    monkeypatch.setattr(services, "can_transition", check_while_other_webhook_wins)
+
+    resp = send(client, payment_id, "failed")
+
+    assert resp.status_code == 409
+    assert resp.json() == {"error": "invalid_transition"}
+    assert status_of(client, payment_id) == "succeeded"
+
+
 def test_webhook_for_missing_payment(client):
     resp = send(client, 9999, "succeeded")
     assert resp.status_code == 404
+
+
+def test_webhook_with_huge_payment_id_is_422(client):
+    assert send(client, 10**20, "succeeded").status_code == 422
 
 
 def test_webhook_unknown_status_is_422(client, payment_id):

@@ -1,10 +1,13 @@
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
+from app.db import INT64_MAX, INT64_MIN
 from app.enums import PaymentMethod, PaymentStatus
 from app.pricing import PROMO_CODES, normalize_promo_code
+
+DbId = Annotated[int, Field(ge=INT64_MIN, le=INT64_MAX)]
 
 
 class TariffOut(BaseModel):
@@ -16,7 +19,7 @@ class TariffOut(BaseModel):
 
 
 class PaymentCreate(BaseModel):
-    tariff_id: int
+    tariff_id: DbId
     email: EmailStr
     method: PaymentMethod
     installment_months: Literal[3, 6, 12] | None = None
@@ -68,5 +71,5 @@ class PaymentOut(BaseModel):
 
 
 class BankWebhook(BaseModel):
-    payment_id: int
+    payment_id: DbId
     status: PaymentStatus

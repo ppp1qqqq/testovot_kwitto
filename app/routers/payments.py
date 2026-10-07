@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_session
+from app.db import INT64_MAX, INT64_MIN, get_session
 from app.enums import PaymentStatus
 from app.models import Payment
 from app.schemas import PaymentCreate, PaymentOut
@@ -16,7 +16,8 @@ router = APIRouter(tags=["payments"])
 def create_payment_view(
     data: PaymentCreate,
     response: Response,
-    idempotency_key: str | None = Header(default=None, max_length=255),
+    # Пустой ключ почти наверняка баг клиента: иначе все такие запросы склеились бы в один платёж
+    idempotency_key: str | None = Header(default=None, min_length=1, max_length=255),
     session: Session = Depends(get_session),
 ) -> Payment:
     try:
@@ -45,7 +46,7 @@ def list_payments(
     email: str | None = None,
     status_: PaymentStatus | None = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+    offset: int = Query(default=0, ge=0, le=INT64_MAX),
     session: Session = Depends(get_session),
 ) -> list[Payment]:
     query = select(Payment).order_by(Payment.id)
@@ -58,7 +59,10 @@ def list_payments(
 
 
 @router.get("/payments/{payment_id}", response_model=PaymentOut)
-def get_payment(payment_id: int, session: Session = Depends(get_session)) -> Payment:
+def get_payment(
+    payment_id: int = Path(ge=INT64_MIN, le=INT64_MAX),
+    session: Session = Depends(get_session),
+) -> Payment:
     payment = session.get(Payment, payment_id)
     if payment is None:
         raise HTTPException(status_code=404, detail="Payment not found")
