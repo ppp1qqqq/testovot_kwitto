@@ -3,8 +3,6 @@
 # код промокода -> скидка в процентах
 PROMO_CODES: dict[str, int] = {"KVITTO10": 10}
 
-INSTALLMENT_MONTHS = (3, 6, 12)
-
 
 def normalize_promo_code(code: str) -> str:
     return code.strip().upper()

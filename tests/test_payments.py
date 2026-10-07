@@ -171,6 +171,28 @@ def test_get_missing_payment_returns_404(client):
     assert resp.status_code == 404
 
 
+def test_max_int64_id_is_still_404(client):
+    assert client.get(f"/payments/{2**63 - 1}").status_code == 404
+
+
+@pytest.mark.parametrize("huge", [2**63, 10**20])
+def test_ids_out_of_int64_are_422_not_500(client, create_payment, huge):
+    # Раньше такие числа долетали до SQLite и падали там с OverflowError (500)
+    assert client.get(f"/payments/{huge}").status_code == 422
+    assert client.get("/payments", params={"offset": huge}).status_code == 422
+    resp = client.post(
+        "/payments", json={"tariff_id": huge, "email": "a@example.com", "method": "card"}
+    )
+    assert resp.status_code == 422
+    assert client.get("/payments").json() == []
+
+
+def test_empty_idempotency_key_is_rejected(client, create_payment):
+    resp = create_payment(headers={"Idempotency-Key": ""})
+    assert resp.status_code == 422
+    assert client.get("/payments").json() == []
+
+
 def test_list_payments_filters(client, create_payment):
     first = create_payment(email="one@example.com").json()
     create_payment(email="two@example.com")

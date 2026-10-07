@@ -4,6 +4,11 @@ from fastapi import Request
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+# id в SQLite (и BIGINT в Postgres) 64-битные. Число больше драйвер не примет
+# и упадёт с OverflowError, поэтому такие значения отсекаем ещё на валидации.
+INT64_MIN = -(2**63)
+INT64_MAX = 2**63 - 1
+
 
 class Base(DeclarativeBase):
     pass
